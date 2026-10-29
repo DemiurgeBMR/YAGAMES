@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Baggage Rush mockups</title>
+<style>
+@font-face{font-family:Rubik;src:url(fonts/rubik-cyr.woff2) format('woff2');font-weight:300 900;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;}
+@font-face{font-family:Rubik;src:url(fonts/rubik-lat.woff2) format('woff2');font-weight:300 900;}
+html,body{margin:0;background:#1b2436;}
+body{display:flex;flex-wrap:wrap;gap:24px;padding:24px;}
+svg{font-family:Rubik,sans-serif;display:block;}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#1b2a44" flood-opacity=".25"/>
+    </filter>
+    <filter id="shBig" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0b1426" flood-opacity=".45"/>
+    </filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6cc0ff"/><stop offset="1" stop-color="#d4f0ff"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ffb800"/>
+    </linearGradient>
+    <linearGradient id="starter" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff9a3c"/><stop offset="1" stop-color="#ff4f8b"/>
+    </linearGradient>
+    <linearGradient id="shopBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34558f"/><stop offset="1" stop-color="#1f3156"/>
+    </linearGradient>
+    <linearGradient id="multi" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3ccf6e"/><stop offset=".5" stop-color="#ff5a5f"/><stop offset="1" stop-color="#3ccf6e"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<svg id="gameplay" width="540" height="960" viewBox="0 0 540 960"></svg>
+<svg id="win" width="540" height="960" viewBox="0 0 540 960"></svg>
+<svg id="lose" width="540" height="960" viewBox="0 0 540 960"></svg>
+<svg id="hub" width="540" height="960" viewBox="0 0 540 960"></svg>
+<svg id="shop" width="540" height="960" viewBox="0 0 540 960"></svg>
+
+<script>
+const C = {red:'#ff5a5f', blue:'#3d8bff', green:'#2fc76a', yellow:'#ffc531', purple:'#9b5de5',
+           orange:'#ff8c2b', grey:'#8a96a8', ink:'#23324a', sub:'#6b7a92'};
+let uid = 0;
+
+function shade(hex, p){
+  const n = parseInt(hex.slice(1),16); let r=n>>16, g=n>>8&255, b=n&255;
+  const t = p<0?0:255, a = Math.abs(p);
+  r=Math.round((t-r)*a+r); g=Math.round((t-g)*a+g); b=Math.round((t-b)*a+b);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function T(x,y,str,o={}){
+  const {size=16,w=700,fill=C.ink,anchor='middle',stroke=null,sw=4,rot=0,op=1,style=''}=o;
+  return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${w}" fill="${fill}" text-anchor="${anchor}" opacity="${op}"`+
+    (stroke?` stroke="${stroke}" stroke-width="${sw}" paint-order="stroke" stroke-linejoin="round"`:'')+
+    (rot?` transform="rotate(${rot} ${x} ${y})"`:'')+(style?` style="${style}"`:'')+`>${str}</text>`;
+}
+function rng(seed){ return ()=>{ seed=(seed*16807)%2147483647; return (seed-1)/2147483646; }; }
+
+function star(cx,cy,r,fill='url(#gold)',stroke='#d98e00',sw=3){
+  let p='';
+  for(let i=0;i<10;i++){
+    const a=-Math.PI/2+i*Math.PI/5, rr=i%2?r*0.48:r;
+    p+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(1)+' '+(cy+rr*Math.sin(a)).toFixed(1);
+  }
+  return `<path d="${p}Z" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+}
+function coin(cx,cy,r){
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#e89a00"/>
+  <circle cx="${cx}" cy="${cy-r*0.08}" r="${r*0.9}" fill="#ffd23f"/>
+  <circle cx="${cx}" cy="${cy-r*0.08}" r="${r*0.55}" fill="none" stroke="#f0a800" stroke-width="${r*0.14}"/>
+  <ellipse cx="${cx-r*0.35}" cy="${cy-r*0.45}" rx="${r*0.22}" ry="${r*0.13}" fill="#fff" opacity=".7" transform="rotate(-35 ${cx-r*0.35} ${cy-r*0.45})"/>`;
+}
+function coinPile(cx,by,n){
+  let s='';
+  const pos=[[0,0],[-14,0],[14,0],[-7,-9],[7,-9],[0,-18],[-21,-9],[21,-9],[-14,-18],[14,-18],[-7,-27],[7,-27],[0,-36],[-28,0],[28,0]];
+  for(let i=0;i<n;i++){ s+=coin(cx+pos[i][0]*1.4, by+pos[i][1]*1.4-14, 14); }
+  return s;
+}
+function adIcon(cx,cy,s=18,bg='#fff',fg=C.orange){
+  return `<rect x="${cx-s*0.75}" y="${cy-s*0.5}" width="${s*1.5}" height="${s}" rx="${s*0.25}" fill="${bg}"/>
+  <path d="M${cx-s*0.18} ${cy-s*0.28} L${cx+s*0.3} ${cy} L${cx-s*0.18} ${cy+s*0.28}Z" fill="${fg}"/>`;
+}
+function pill(x,y,w,h,fill='#fff',op=1){
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h/2}" fill="${fill}" opacity="${op}" filter="url(#sh)"/>`;
+}
+function btn(x,y,w,h,color,inner='',rx=null){
+  const d=shade(color,-0.3); rx = rx ?? Math.min(h/2.4, 26);
+  return `<g filter="url(#sh)"><rect x="${x}" y="${y+6}" width="${w}" height="${h}" rx="${rx}" fill="${d}"/>
+  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${color}"/>
+  <rect x="${x+8}" y="${y+5}" width="${w-16}" height="${h*0.36}" rx="${rx*0.7}" fill="#fff" opacity=".22"/></g>`+inner;
+}
+function ribbon(cx,y,w,text,color,size=26){
+  const d=shade(color,-0.35), h=56;
+  return `<g filter="url(#sh)">
+   <path d="M${cx-w/2-34} ${y+14} h40 v${h} h-40 l14 -${h/2}Z" fill="${d}"/>
+   <path d="M${cx+w/2+34} ${y+14} h-40 v${h} h40 l-14 -${h/2}Z" fill="${d}"/>
+   <rect x="${cx-w/2}" y="${y}" width="${w}" height="${h}" rx="8" fill="${color}"/>
+   <rect x="${cx-w/2+6}" y="${y+5}" width="${w-12}" height="16" rx="6" fill="#fff" opacity=".2"/></g>`+
+   T(cx,y+38,text,{size,w:900,fill:'#fff',stroke:d,sw:5});
+}
+
+/* ---------- suitcase ---------- */
+function suitcase(cx,by,w,h,color,o={}){
+  const id=++uid, x=cx-w/2, y=by-h;
+  const dark=shade(color,-0.28), light=shade(color,0.3);
+  let s=`<g${o.rot?` transform="rotate(${o.rot} ${cx} ${by-h/2})"`:''}${o.op?` opacity="${o.op}"`:''}>`;
+  if(!o.noShadow) s+=`<ellipse cx="${cx}" cy="${by+(o.shadowDy||3)}" rx="${w*0.55}" ry="${o.shadowRy||5}" fill="#000" opacity="${o.shadowOp||.18}"/>`;
+  s+=`<circle cx="${x+w*0.2}" cy="${by-2}" r="${Math.max(3,w*0.06)}" fill="#2b3240"/><circle cx="${x+w*0.8}" cy="${by-2}" r="${Math.max(3,w*0.06)}" fill="#2b3240"/>`;
+  s+=`<rect x="${cx-w*0.17}" y="${y-h*0.16}" width="${w*0.34}" height="${h*0.26}" rx="${w*0.07}" fill="none" stroke="#39414f" stroke-width="${Math.max(3,w*0.07)}"/>`;
+  s+=`<defs><linearGradient id="sg${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light}"/><stop offset=".55" stop-color="${color}"/></linearGradient></defs>`;
+  s+=`<rect x="${x}" y="${y}" width="${w}" height="${h-4}" rx="${Math.min(13,w*0.2)}" fill="url(#sg${id})" stroke="${dark}" stroke-width="2.5"/>`;
+  s+=`<rect x="${x+w*0.24}" y="${y+5}" width="${w*0.08}" height="${h-14}" rx="2" fill="${dark}" opacity=".35"/>`;
+  s+=`<rect x="${x+w*0.68}" y="${y+5}" width="${w*0.08}" height="${h-14}" rx="2" fill="${dark}" opacity=".35"/>`;
+  s+=`<rect x="${x+6}" y="${y+4}" width="${w-12}" height="${Math.max(3,h*0.07)}" rx="2" fill="#fff" opacity=".4"/>`;
+  if(o.locked){
+    s+=`<rect x="${x}" y="${y}" width="${w}" height="${h-4}" rx="${Math.min(13,w*0.2)}" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/>`;
+    s+=T(cx,by-h*0.3,'?',{size:h*0.55,w:900,fill:'#fff',stroke:dark,sw:4});
+  } else if(o.tag){
+    const tw=Math.max(30,w*0.56), th=Math.max(13,h*0.24);
+    s+=`<rect x="${cx-tw/2}" y="${by-h*0.5-th/2}" width="${tw}" height="${th}" rx="4" fill="#fff" opacity=".95"/>`;
+    s+=T(cx,by-h*0.5+th*0.33,o.tag,{size:th*0.82,w:800,fill:dark});
+  }
+  if(o.heavy){
+    s+=`<rect x="${cx-26}" y="${by-h*0.5-15}" width="52" height="30" rx="7" fill="#fff" opacity=".95"/>`;
+    s+=T(cx,by-h*0.5+6,'25 кг',{size:15,w:900,fill:dark});
+  }
+  if(o.vip){
+    s+=`<circle cx="${x+w-4}" cy="${y+4}" r="14" fill="#2b3240"/>`+star(x+w-4,y+4,11,'url(#gold)','#ffb800',1.5);
+  }
+  return s+'</g>';
+}
+
+/* ---------- airplane (nose at 0,0, facing left) ---------- */
+function plane(x,y,s,rot=0,color=C.blue){
+  return `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">
+   <path d="M110 0 L150 -2 L178 -30 L166 -30Z" fill="#d5dde8"/>
+   <path d="M18 -14 L196 -14 L226 -50 L250 -50 L238 -12 Q254 -6 252 2 Q250 10 232 12 L24 14 Q0 14 0 0 Q0 -14 18 -14Z" fill="#fff" stroke="#c3cfdd" stroke-width="2"/>
+   <path d="M196 -14 L226 -50 L250 -50 L238 -14Z" fill="${color}"/>
+   <path d="M3 4 L248 4 L246 9 L8 10Z" fill="${color}"/>
+   ${Array.from({length:12},(_,i)=>`<circle cx="${42+i*13}" cy="-4" r="2.6" fill="#5b6b82"/>`).join('')}
+   <path d="M7 -6 L20 -9 L22 -3 L5 -2Z" fill="#2f3d52"/>
+   <path d="M212 -6 L246 -9 L256 -2 L220 -1Z" fill="#e2e8f0" stroke="#c3cfdd" stroke-width="1.5"/>
+   <path d="M95 6 L150 6 L122 44 L105 44Z" fill="#eef2f7" stroke="#c3cfdd" stroke-width="2"/>
+   <rect x="92" y="16" width="38" height="15" rx="7.5" fill="#b8c4d3"/>
+  </g>`;
+}
+function cloud(cx,cy,s=1,op=.9){
+  return `<g transform="translate(${cx} ${cy}) scale(${s})" opacity="${op}" fill="#fff">
+   <circle cx="-22" cy="4" r="16"/><circle cx="0" cy="-6" r="22"/><circle cx="24" cy="4" r="15"/><rect x="-38" y="4" width="78" height="16" rx="8"/></g>`;
+}
+
+/* ---------- luggage cart ---------- */
+function cart(cx,by,color,code,city,fill,cap=4){
+  const dark=shade(color,-0.3);
+  let s='';
+  s+=`<ellipse cx="${cx-4}" cy="${by+4}" rx="74" ry="9" fill="#000" opacity=".14"/>`;
+  // handle
+  s+=`<rect x="${cx+52}" y="${by-118}" width="8" height="104" rx="4" fill="#6f7d92"/>`;
+  s+=`<rect x="${cx+44}" y="${by-124}" width="26" height="10" rx="5" fill="#39414f"/>`;
+  // sign
+  s+=`<rect x="${cx-3}" y="${by-160}" width="6" height="40" fill="#8a96a8"/>`;
+  s+=`<g filter="url(#sh)"><rect x="${cx-54}" y="${by-212}" width="108" height="58" rx="12" fill="${color}" stroke="${dark}" stroke-width="3"/></g>`;
+  s+=`<rect x="${cx-48}" y="${by-207}" width="96" height="14" rx="6" fill="#fff" opacity=".22"/>`;
+  s+=T(cx,by-178,code,{size:26,w:900,fill:'#fff',stroke:dark,sw:4});
+  s+=T(cx,by-160,city,{size:13,w:700,fill:'#fff',op:.95});
+  // slots + suitcases
+  const slots=[[cx-30,by-22],[cx+18,by-22],[cx-30,by-74],[cx+18,by-74]];
+  for(let i=0;i<cap;i++){
+    const [sx,sy]=slots[i];
+    if(i<fill) s+=suitcase(sx,sy,44,44,color,{noShadow:true});
+    else s+=`<rect x="${sx-22}" y="${sy-44}" width="44" height="40" rx="8" fill="${color}" opacity=".12" stroke="${color}" stroke-width="2" stroke-dasharray="5 4"/>`;
+  }
+  // platform + wheels
+  s+=`<rect x="${cx-66}" y="${by-24}" width="128" height="14" rx="5" fill="#7f8ea3"/><rect x="${cx-66}" y="${by-24}" width="128" height="4" rx="2" fill="#b3bfcf"/>`;
+  s+=`<rect x="${cx-68}" y="${by-38}" width="7" height="22" rx="3" fill="#7f8ea3"/>`;
+  for(const wx of [cx-46,cx+40]) s+=`<circle cx="${wx}" cy="${by-4}" r="10" fill="#2b3240"/><circle cx="${wx}" cy="${by-4}" r="4" fill="#8a96a8"/>`;
+  // counter
+  s+=`<rect x="${cx-26}" y="${by+12}" width="52" height="24" rx="12" fill="${C.ink}" opacity=".85"/>`;
+  s+=T(cx,by+29,`${fill}/${cap}`,{size:15,w:800,fill:'#fff'});
+  return s;
+}
+
+/* ---------- booster icons ---------- */
+const icons = {
+  magnet:(cx,cy)=>`<path d="M${cx-14} ${cy-14} v12 a14 14 0 0 0 28 0 v-12" fill="none" stroke="#ff4d5a" stroke-width="10"/>
+     <rect x="${cx-19}" y="${cy-20}" width="10" height="9" fill="#c7d0dc"/><rect x="${cx+9}" y="${cy-20}" width="10" height="9" fill="#c7d0dc"/>`,
+  freeze:(cx,cy)=>{let s='';for(const a of [0,60,120]){s+=`<g transform="rotate(${a} ${cx} ${cy})" stroke="#38b6ff" stroke-width="4.5" stroke-linecap="round" fill="none">
+     <path d="M${cx} ${cy-20} V${cy+20}"/><path d="M${cx-6} ${cy-15} L${cx} ${cy-9} L${cx+6} ${cy-15}"/><path d="M${cx-6} ${cy+15} L${cx} ${cy+9} L${cx+6} ${cy+15}"/></g>`;}return s;},
+  slot:(cx,cy)=>`<rect x="${cx-19}" y="${cy-17}" width="38" height="34" rx="8" fill="none" stroke="#2fc76a" stroke-width="4.5" stroke-dasharray="6 4"/>
+     <path d="M${cx} ${cy-9} V${cy+9} M${cx-9} ${cy} H${cx+9}" stroke="#2fc76a" stroke-width="5" stroke-linecap="round"/>`,
+  shuffle:(cx,cy)=>`<g fill="none" stroke="#9b5de5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+     <path d="M${cx-20} ${cy-10} h8 l18 20 h10"/><path d="M${cx-20} ${cy+10} h8 l18 -20 h10"/>
+     <path d="M${cx+11} ${cy-16} l6 6 l-6 6"/><path d="M${cx+11} ${cy+4} l6 6 l-6 6"/></g>`,
+  gift:(cx,cy)=>`<rect x="${cx-16}" y="${cy-4}" width="32" height="20" rx="3" fill="#ff5a5f"/><rect x="${cx-19}" y="${cy-12}" width="38" height="10" rx="3" fill="#ff7a7f"/>
+     <rect x="${cx-4}" y="${cy-12}" width="8" height="28" fill="#ffd23f"/><ellipse cx="${cx-7}" cy="${cy-16}" rx="7" ry="5" fill="#ffd23f"/><ellipse cx="${cx+7}" cy="${cy-16}" rx="7" ry="5" fill="#ffd23f"/>`,
+  wheel:(cx,cy)=>{const cols=['#ff5a5f','#ffc531','#2fc76a','#3d8bff','#9b5de5','#ff8c2b'];let s='';const r=19;
+     for(let i=0;i<6;i++){const a1=i*Math.PI/3-Math.PI/2,a2=a1+Math.PI/3;
+       s+=`<path d="M${cx} ${cy} L${cx+r*Math.cos(a1)} ${cy+r*Math.sin(a1)} A${r} ${r} 0 0 1 ${cx+r*Math.cos(a2)} ${cy+r*Math.sin(a2)}Z" fill="${cols[i]}"/>`;}
+     return s+`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="3"/><circle cx="${cx}" cy="${cy}" r="5" fill="#fff"/><path d="M${cx-5} ${cy-24} h10 l-5 9Z" fill="#23324a"/>`;},
+  trophy:(cx,cy)=>`<path d="M${cx-13} ${cy-16} h26 v8 a13 13 0 0 1 -26 0Z" fill="url(#gold)" stroke="#d98e00" stroke-width="2"/>
+     <path d="M${cx-13} ${cy-12} h-6 a6 7 0 0 0 8 10 M${cx+13} ${cy-12} h6 a6 7 0 0 1 -8 10" fill="none" stroke="#d98e00" stroke-width="3"/>
+     <rect x="${cx-3}" y="${cy+4}" width="6" height="7" fill="#d98e00"/><rect x="${cx-11}" y="${cy+11}" width="22" height="6" rx="2" fill="#d98e00"/>`,
+  bag:(cx,cy)=>`<path d="M${cx-8} ${cy-8} v-4 a8 8 0 0 1 16 0 v4" fill="none" stroke="#23324a" stroke-width="3.5"/>
+     <path d="M${cx-17} ${cy-9} h34 l-3 27 h-28Z" fill="#2fc76a" stroke="#1f9a50" stroke-width="2"/>${coin(cx,cy+5,7)}`,
+  noads:(cx,cy)=>`<circle cx="${cx}" cy="${cy}" r="18" fill="#fff" stroke="#ff4d5a" stroke-width="4"/>`+T(cx,cy+5,'ADS',{size:12,w:900,fill:'#23324a'})+
+     `<path d="M${cx-12} ${cy-12} L${cx+12} ${cy+12}" stroke="#ff4d5a" stroke-width="4" stroke-linecap="round"/>`,
+  gear:(cx,cy)=>{let s=`<g fill="#5b6b82">`;for(let i=0;i<8;i++)s+=`<rect x="${cx-4}" y="${cy-17}" width="8" height="10" rx="2" transform="rotate(${i*45} ${cx} ${cy})"/>`;
+     return s+`<circle cx="${cx}" cy="${cy}" r="11"/></g><circle cx="${cx}" cy="${cy}" r="5" fill="#fff"/>`;},
+  truck:(cx,cy)=>`<path d="M${cx-10} ${cy-16} v28 h20" fill="none" stroke="#5b6b82" stroke-width="4" stroke-linecap="round"/><circle cx="${cx-6}" cy="${cy+14}" r="5" fill="#23324a"/>
+     <rect x="${cx-4}" y="${cy-12}" width="16" height="20" rx="3" fill="#ff8c2b"/>`,
+  cash:(cx,cy)=>`${coin(cx-6,cy+6,10)}${coin(cx+6,cy+2,10)}${coin(cx,cy-6,10)}`,
+  house:(cx,cy)=>`<path d="M${cx-17} ${cy-2} L${cx} ${cy-17} L${cx+17} ${cy-2}Z" fill="#9b5de5"/><rect x="${cx-13}" y="${cy-3}" width="26" height="19" fill="#c9a8f2"/><rect x="${cx-5}" y="${cy+4}" width="10" height="12" fill="#6b3fb0"/>`,
+  people:(cx,cy)=>`<circle cx="${cx-7}" cy="${cy-8}" r="7" fill="#3d8bff"/><path d="M${cx-19} ${cy+12} a12 12 0 0 1 24 0Z" fill="#3d8bff"/>
+     <circle cx="${cx+8}" cy="${cy-6}" r="6" fill="#9b5de5"/><path d="M${cx-1} ${cy+12} a10 10 0 0 1 20 0Z" fill="#9b5de5"/>`,
+  lock:(cx,cy)=>`<path d="M${cx-5} ${cy-2} v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="#fff" stroke-width="2.5"/><rect x="${cx-7}" y="${cy-2}" width="14" height="10" rx="2" fill="#fff"/>`,
+  pause:(cx,cy)=>`<rect x="${cx-8}" y="${cy-10}" width="6" height="20" rx="2" fill="${C.ink}"/><rect x="${cx+2}" y="${cy-10}" width="6" height="20" rx="2" fill="${C.ink}"/>`,
+};
+
+function coinsPill(x,y,value){
+  return pill(x,y,130,42)+coin(x+22,y+21,15)+T(x+76,y+29,value,{size:21,w:800})+
+    `<circle cx="${x+120}" cy="${y+21}" r="11" fill="${C.green}"/><path d="M${x+120} ${y+15} v12 M${x+114} ${y+21} h12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`;
+}
+
+/* ================= GAMEPLAY ================= */
+function gameplayScene(){
+  let s='';
+  s+=`<rect width="540" height="960" fill="#dde5ee"/>`;
+  // floor tiles
+  for(let y=300;y<960;y+=64) s+=`<rect x="0" y="${y}" width="540" height="2" fill="#cfd9e5"/>`;
+  for(let x=0;x<540;x+=90) s+=`<rect x="${x}" y="258" width="2" height="702" fill="#d3dce7"/>`;
+  // window wall
+  s+=`<rect width="540" height="232" fill="#e9eff6"/>`;
+  s+=`<rect x="0" y="58" width="540" height="164" fill="url(#sky)"/>`;
+  s+=cloud(90,150,1.0)+cloud(430,140,.8)+cloud(250,170,.6,.7);
+  s+=`<rect x="0" y="184" width="540" height="18" fill="#9fd48a"/><rect x="0" y="198" width="540" height="24" fill="#8c98a8"/>`;
+  for(let x=10;x<540;x+=60) s+=`<rect x="${x}" y="209" width="30" height="3" fill="#fff" opacity=".8"/>`;
+  s+=plane(300,120,.62,12,C.red);
+  s+=plane(60,100,.22,8,C.blue);
+  for(const x of [-4,131,266,401,536]) s+=`<rect x="${x}" y="58" width="8" height="164" fill="#c5d0dd"/>`;
+  s+=`<rect x="0" y="52" width="540" height="10" fill="#c5d0dd"/><rect x="0" y="218" width="540" height="14" fill="#b6c3d3"/>`;
+
+  // HUD
+  s+=`<circle cx="40" cy="38" r="24" fill="#fff" filter="url(#sh)"/>`+icons.pause(40,38);
+  s+=pill(190,16,160,44)+T(270,46,'Уровень 7',{size:22,w:800});
+  s+=coinsPill(396,17,'1 250');
+  // flights progress
+  s+=pill(130,74,280,40,'#fff',.96);
+  s+=T(156,100,'Рейсы',{size:16,w:700,anchor:'start',fill:C.sub});
+  s+=`<rect x="222" y="88" width="138" height="12" rx="6" fill="#e3e9f1"/><rect x="222" y="88" width="${138*3/8}" height="12" rx="6" fill="${C.green}"/>`;
+  s+=T(386,100,'3/8',{size:16,w:800});
+
+  s+=`<g transform="translate(0 -32)">`;
+  // conveyor belt
+  s+=`<rect x="30" y="362" width="476" height="30" fill="#5d6778"/>`;
+  for(let x=50;x<506;x+=38) s+=`<circle cx="${x}" cy="377" r="8" fill="#7c879a"/><circle cx="${x}" cy="377" r="3" fill="#3f4757"/>`;
+  s+=`<rect x="30" y="298" width="476" height="66" fill="#3b4252"/>`;
+  for(let x=44;x<506;x+=26) s+=`<rect x="${x}" y="302" width="2" height="58" fill="#30363f"/>`;
+  for(let x=80;x<500;x+=120) s+=`<path d="M${x} 318 l14 13 l-14 13" fill="none" stroke="#56607a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  s+=`<rect x="30" y="296" width="476" height="5" fill="#97a3b5"/><rect x="30" y="360" width="476" height="4" fill="#2a303b"/>`;
+  // end roller + chute to buffer
+  s+=`<circle cx="506" cy="330" r="34" fill="#4b5465"/><circle cx="506" cy="330" r="10" fill="#7c879a"/>`;
+  s+=`<path d="M500 364 L540 364 L540 418 L516 418Z" fill="#9aa7b8"/>`;
+  s+=`<path d="M512 378 l10 10 l10 -10 M512 394 l10 10 l10 -10" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // entry tunnel with flaps
+  s+=`<path d="M0 266 H52 Q66 266 66 280 V394 H0Z" fill="#6c7a90"/>`;
+  s+=`<rect x="0" y="288" width="52" height="76" fill="#1f242d"/>`;
+  for(let x=3;x<52;x+=8) s+=`<rect x="${x}" y="290" width="6" height="70" rx="2" fill="#2f3743"/>`;
+  s+=`<rect x="0" y="270" width="58" height="12" fill="#ffc531"/>`;
+  for(let x=0;x<58;x+=14) s+=`<path d="M${x} 282 l7 -12 h7 l-7 12Z" fill="#23324a"/>`;
+  // suitcases on belt
+  s+=suitcase(108,352,62,60,C.blue,{tag:'KZN'});
+  s+=suitcase(190,352,58,54,'#7d889a',{locked:true});
+  s+=suitcase(360,352,58,66,C.green,{tag:'LED'});
+  s+=suitcase(446,352,66,58,C.blue,{tag:'KZN',vip:true});
+
+  // buffer
+  s+=`<rect x="14" y="424" width="512" height="122" rx="20" fill="#c4cfdd" stroke="#aab7c8" stroke-width="3"/>`;
+  const sw=74, gap=9, sx0=270-(6*sw+5*gap)/2;
+  for(let i=0;i<6;i++){
+    const x=sx0+i*(sw+gap);
+    s+=`<rect x="${x}" y="440" width="${sw}" height="94" rx="13" fill="#aebbd0"/>`;
+    if(i<2||i>3) s+=`<rect x="${x+5}" y="445" width="${sw-10}" height="84" rx="10" fill="none" stroke="#93a2b8" stroke-width="2" stroke-dasharray="6 5"/>`;
+  }
+  s+=suitcase(sx0+sw/2,524,56,58,C.yellow,{tag:'IST'});
+  s+=suitcase(sx0+sw*1.5+gap,524,56,62,C.purple,{tag:'DXB'});
+  const hx=sx0+2*(sw+gap);
+  s+=`<rect x="${hx}" y="440" width="${2*sw+gap}" height="94" rx="13" fill="#a3b1c7"/>`;
+  s+=suitcase(hx+sw+gap/2,526,140,70,'#c9853f',{heavy:true});
+  s+=`<rect x="${sx0+5*(sw+gap)}" y="440" width="${sw}" height="94" rx="13" fill="#ff5a5f" opacity=".14"/>`;
+  s+=`<g filter="url(#sh)"><rect x="26" y="408" width="132" height="30" rx="15" fill="#ffb020"/></g>`;
+  s+=T(92,429,'БУФЕР 4/6',{size:16,w:900,fill:'#4a2c00'});
+
+  s+=`</g>`;
+  // carts
+  s+=cart(95,815,C.red,'AER','Сочи',2);
+  s+=cart(270,815,C.blue,'KZN','Казань',3);
+  s+=cart(445,815,C.green,'LED','Питер',1);
+
+  // drag trail + dragged suitcase
+  s+=`<path d="M272 316 C 262 430, 190 470, 128 540" fill="none" stroke="#fff" stroke-width="7" stroke-dasharray="2 14" stroke-linecap="round" opacity=".95"/>`;
+  s+=`<path d="M272 316 C 262 430, 190 470, 128 540" fill="none" stroke="${C.red}" stroke-width="3" stroke-dasharray="2 14" stroke-linecap="round"/>`;
+  s+=`<circle cx="272" cy="298" r="22" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>`;
+  s+=suitcase(108,592,64,62,C.red,{tag:'AER',rot:-10,shadowDy:22,shadowRy:7,shadowOp:.22});
+  s+=`<text x="122" y="622" font-size="44" font-family="Noto Color Emoji">👆</text>`;
+  // combo popup
+  s+=T(372,566,'КОМБО ×3!',{size:34,w:900,fill:'#ffd23f',stroke:'#b35c00',sw:7,rot:-6});
+  s+=T(470,586,'+15',{size:22,w:900,fill:'#fff',stroke:'#e09a00',sw:5,rot:-6})+coin(506,580,11);
+  return s;
+}
+function boosterBar(){
+  let s=`<rect x="0" y="866" width="540" height="110" rx="28" fill="#fff" filter="url(#shBig)"/>`;
+  const b=[['magnet','Магнит','2'],['freeze','Заморозка','1'],['slot','+Слот',null],['shuffle','Микс','3']];
+  b.forEach(([ic,label,cnt],i)=>{
+    const c=81+i*126;
+    s+=`<rect x="${c-50}" y="876" width="100" height="78" rx="18" fill="#f1f5fa" stroke="#d5dee9" stroke-width="2"/>`;
+    s+=icons[ic](c,904)+T(c,944,label,{size:13,w:700,fill:'#4a5a72'});
+    if(cnt) s+=`<circle cx="${c+42}" cy="880" r="13" fill="#ff4d5a" stroke="#fff" stroke-width="2.5"/>`+T(c+42,885,cnt,{size:14,w:900,fill:'#fff'});
+    else s+=`<rect x="${c+18}" y="868" width="42" height="24" rx="12" fill="${C.orange}" stroke="#fff" stroke-width="2.5"/>`+adIcon(c+39,880,13,'#fff',C.orange);
+  });
+  return s;
+}
+
+document.getElementById('gameplay').innerHTML = gameplayScene()+boosterBar();
+
+/* ================= WIN ================= */
+(function(){
+  let s=gameplayScene()+boosterBar();
+  s+=`<rect width="540" height="960" fill="#122038" opacity=".78"/>`;
+  // rays
+  let rays='';for(let i=0;i<16;i++){rays+=`<path d="M270 215 L${270+700*Math.cos(i*Math.PI/8)} ${215+700*Math.sin(i*Math.PI/8)} L${270+700*Math.cos(i*Math.PI/8+0.12)} ${215+700*Math.sin(i*Math.PI/8+0.12)}Z" fill="#fff"/>`;}
+  s+=`<g opacity=".06">${rays}</g>`;
+  const r=rng(7), cols=[C.red,C.yellow,C.green,C.blue,C.purple,C.orange];
+  for(let i=0;i<46;i++){const x=r()*540,y=r()*330+10;s+=`<rect x="${x}" y="${y}" width="${6+r()*8}" height="${10+r()*8}" rx="2" fill="${cols[i%6]}" transform="rotate(${r()*180} ${x} ${y})"/>`;}
+  s+=`<rect x="40" y="290" width="460" height="530" rx="30" fill="#fff" filter="url(#shBig)"/>`;
+  s+=star(165,240,44)+star(375,240,44)+star(270,205,62);
+  s+=ribbon(270,276,330,'УРОВЕНЬ ПРОЙДЕН!',C.green,27);
+  s+=T(270,380,'Все рейсы вылетели вовремя!',{size:18,w:600,fill:C.sub});
+  // rewards
+  s+=`<rect x="76" y="400" width="182" height="76" rx="18" fill="#f1f5fa"/><rect x="282" y="400" width="182" height="76" rx="18" fill="#f1f5fa"/>`;
+  s+=coin(118,438,20)+T(198,448,'+60',{size:30,w:900});
+  s+=icons.people(322,438)+T(400,442,'+240',{size:26,w:900})+T(400,464,'пассажиров',{size:12,w:600,fill:C.sub});
+  // multiplier bar
+  s+=T(270,512,'Останови множитель!',{size:15,w:700,fill:C.sub});
+  const seg=['×2','×3','×5','×3','×2'], segC=['#3ccf6e','#ffc531','#ff5a5f','#ffc531','#3ccf6e'];
+  seg.forEach((t,i)=>{const x=75+i*78;
+    s+=`<rect x="${x}" y="526" width="74" height="46" rx="${i==0||i==4?14:6}" fill="${segC[i]}"/>`+T(x+37,557,t,{size:22,w:900,fill:'#fff',stroke:shade(segC[i],-0.35),sw:4});});
+  s+=`<path d="M178 514 l12 16 l12 -16Z" fill="${C.ink}" stroke="#fff" stroke-width="3"/><rect x="187" y="526" width="6" height="52" rx="3" fill="${C.ink}" stroke="#fff" stroke-width="2"/>`;
+  s+=btn(78,604,384,78,C.orange,
+     adIcon(146,643,28,'#fff',C.orange)+T(290,654,'ЗАБРАТЬ 180',{size:30,w:900,fill:'#fff',stroke:'#b35c00',sw:5})+coin(420,643,15));
+  s+=T(270,730,'Нет, спасибо · забрать 60',{size:17,w:600,fill:'#97a3b5',style:'text-decoration:underline'});
+  s+=`<rect x="160" y="760" width="220" height="34" rx="17" fill="#eef2f7"/>`+T(270,783,'Дальше: Уровень 8 ›',{size:15,w:700,fill:C.sub});
+  document.getElementById('win').innerHTML=s;
+})();
+
+/* ================= LOSE ================= */
+(function(){
+  let s=gameplayScene()+boosterBar();
+  s+=`<rect width="540" height="960" fill="#2a1020" opacity=".8"/>`;
+  s+=`<rect x="40" y="210" width="460" height="620" rx="30" fill="#fff" filter="url(#shBig)"/>`;
+  s+=ribbon(270,180,340,'БУФЕР ПЕРЕПОЛНЕН!',C.red,26);
+  // illustration: overflowing shelf
+  s+=`<ellipse cx="270" cy="438" rx="200" ry="14" fill="#000" opacity=".08"/>`;
+  s+=`<rect x="92" y="372" width="356" height="64" rx="12" fill="#c4cfdd"/>`;
+  const cols=[C.yellow,C.purple,C.blue,C.green,C.red,C.purple];
+  for(let i=0;i<6;i++){const x=100+i*58; s+=`<rect x="${x}" y="378" width="52" height="52" rx="8" fill="#aebbd0"/>`;
+    s+=suitcase(x+26,426,40,38,cols[i],{noShadow:true});}
+  s+=suitcase(180,350,48,44,C.orange,{rot:-28,noShadow:true});
+  s+=suitcase(278,312,52,48,C.blue,{rot:12,noShadow:true});
+  s+=suitcase(366,344,46,42,C.green,{rot:30,noShadow:true});
+  s+=`<path d="M420 262 l30 52 h-60Z" fill="#ffc531" stroke="#c98600" stroke-width="3" stroke-linejoin="round"/>`+T(420,306,'!',{size:30,w:900,fill:'#4a2c00'});
+  s+=`<path d="M128 290 q-10 -16 4 -26 M146 278 q-4 -18 12 -22" fill="none" stroke="#97a3b5" stroke-width="3" stroke-linecap="round"/>`;
+  // progress
+  s+=T(270,488,'Осталось всего 2 рейса!',{size:24,w:900});
+  s+=`<rect x="110" y="504" width="320" height="18" rx="9" fill="#e3e9f1"/><rect x="110" y="504" width="${320*6/8}" height="18" rx="9" fill="${C.green}"/>`;
+  s+=T(270,518,'6 / 8',{size:13,w:800,fill:'#fff'});
+  s+=T(270,560,'Второй шанс: очистим буфер',{size:17,w:600,fill:C.sub});
+  s+=T(270,583,'и дадим +1 слот до конца уровня',{size:17,w:600,fill:C.sub});
+  s+=btn(78,608,384,78,C.orange,adIcon(128,647,28,'#fff',C.orange)+T(296,658,'ПРОДОЛЖИТЬ',{size:30,w:900,fill:'#fff',stroke:'#b35c00',sw:5}));
+  s+=btn(108,708,324,62,C.blue,T(250,748,'Продолжить за 300',{size:21,w:800,fill:'#fff',stroke:'#1f5fbf',sw:4})+coin(375,740,14));
+  s+=T(270,806,'Начать уровень заново',{size:17,w:600,fill:'#97a3b5',style:'text-decoration:underline'});
+  document.getElementById('lose').innerHTML=s;
+})();
+
+/* ================= HUB ================= */
+(function(){
+  let s=`<rect width="540" height="960" fill="#eef2f7"/>`;
+  s+=`<rect width="540" height="440" fill="url(#sky)"/>`;
+  s+=cloud(120,150,1.1)+cloud(420,120,.9)+cloud(300,190,.6,.7);
+  s+=plane(300,90,.42,14,C.purple);
+  // ground
+  s+=`<path d="M0 360 Q270 340 540 360 V440 H0Z" fill="#9fd48a"/>`;
+  s+=`<rect x="0" y="378" width="540" height="62" fill="#8c98a8"/>`;
+  for(let x=10;x<540;x+=56) s+=`<rect x="${x}" y="408" width="28" height="4" fill="#fff" opacity=".8"/>`;
+  // tower
+  s+=`<rect x="118" y="196" width="26" height="186" fill="#e6ecf3" stroke="#c3cfdd" stroke-width="2"/>`;
+  s+=`<path d="M100 160 h62 l-8 38 h-46Z" fill="#5fb8ff" stroke="#3a7fc4" stroke-width="3"/>`;
+  s+=`<rect x="96" y="150" width="70" height="12" rx="4" fill="#3b4252"/><rect x="129" y="126" width="4" height="26" fill="#3b4252"/><circle cx="131" cy="124" r="5" fill="${C.red}"/>`;
+  // terminal
+  s+=`<path d="M168 262 Q300 200 448 262 V384 H168Z" fill="#f6f9fc" stroke="#c3cfdd" stroke-width="2"/>`;
+  s+=`<path d="M160 264 Q300 196 456 264 L448 272 Q300 210 168 272Z" fill="#9fb2c9"/>`;
+  s+=`<rect x="180" y="292" width="256" height="84" fill="#7fc4ff" opacity=".9"/>`;
+  for(let x=180;x<=436;x+=32) s+=`<rect x="${x-2}" y="292" width="4" height="84" fill="#5b8fc4"/>`;
+  s+=`<rect x="180" y="330" width="256" height="3" fill="#5b8fc4"/>`;
+  s+=`<rect x="228" y="250" width="160" height="30" rx="6" fill="#23324a"/>`+T(308,271,'ТЕРМИНАЛ 1',{size:16,w:800,fill:'#fff'});
+  s+=`<rect x="290" y="350" width="36" height="34" fill="#4a6c96"/>`;
+  // jet bridge + plane
+  s+=`<rect x="436" y="318" width="44" height="18" fill="#d5dde8" stroke="#a9b6c7" stroke-width="2"/>`;
+  s+=plane(478,334,.8,0,C.blue);
+  // baggage train
+  s+=`<rect x="150" y="396" width="40" height="22" rx="5" fill="${C.yellow}"/><rect x="156" y="384" width="20" height="16" rx="3" fill="#7fc4ff" stroke="${C.yellow}" stroke-width="3"/>`;
+  for(const x of [158,182]) s+=`<circle cx="${x}" cy="420" r="5" fill="#2b3240"/>`;
+  [[200,[C.red,C.blue]],[262,[C.green,C.yellow]]].forEach(([x,cs])=>{
+    s+=`<rect x="${x}" y="408" width="54" height="8" rx="3" fill="#7f8ea3"/><circle cx="${x+10}" cy="420" r="5" fill="#2b3240"/><circle cx="${x+44}" cy="420" r="5" fill="#2b3240"/>`;
+    s+=suitcase(x+14,408,22,22,cs[0],{noShadow:true})+suitcase(x+40,408,22,24,cs[1],{noShadow:true});
+  });
+  // level badges
+  const badge=(x,y,t)=>`<g filter="url(#sh)"><rect x="${x-34}" y="${y-15}" width="68" height="30" rx="15" fill="#fff"/></g>`+
+    T(x-6,y+6,t,{size:14,w:800})+`<circle cx="${x+20}" cy="${y}" r="10" fill="${C.green}"/><path d="M${x+20} ${y+5} v-9 m-5 5 l5 -5 l5 5" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  s+=badge(131,110,'Ур.2')+badge(308,222,'Ур.3');
+  // HUD
+  s+=`<circle cx="38" cy="38" r="24" fill="#fff" filter="url(#sh)"/>`+icons.gear(38,38);
+  s+=coinsPill(396,17,'1 250');
+  s+=pill(150,16,220,44)+T(260,45,'МОСКВА',{size:20,w:900})+T(260,58,'',{size:1});
+  s+=`<circle cx="176" cy="38" r="12" fill="#ff5a5f"/><path d="M176 31 a6 6 0 0 1 6 6 c0 5 -6 10 -6 10 c0 0 -6 -5 -6 -10 a6 6 0 0 1 6 -6Z" fill="#fff"/>`;
+  s+=T(342,45,'11/25',{size:14,w:700,fill:C.sub});
+  // side buttons
+  const side=(x,y,ic,label,dot)=>`<circle cx="${x}" cy="${y}" r="27" fill="#fff" filter="url(#sh)"/>`+icons[ic](x,y)+
+     (dot?`<circle cx="${x+20}" cy="${y-20}" r="7" fill="#ff4d5a" stroke="#fff" stroke-width="2"/>`:'')+
+     `<rect x="${x-32}" y="${y+24}" width="64" height="18" rx="9" fill="#23324a" opacity=".8"/>`+T(x,y+37,label,{size:11,w:700,fill:'#fff'});
+  s+=side(40,128,'gift','Подарок',true)+side(40,210,'wheel','Колесо',true)+side(40,292,'trophy','Рейтинг');
+  s+=side(500,128,'bag','Магазин')+side(500,210,'noads','Без рекл.');
+  // offline income
+  s+=`<rect x="20" y="452" width="500" height="84" rx="20" fill="#fff" filter="url(#sh)"/>`;
+  s+=icons.cash(62,494)+T(96,484,'Пока вас не было:',{size:14,w:600,fill:C.sub,anchor:'start'});
+  s+=T(96,514,'+320',{size:28,w:900,anchor:'start'})+coin(190,505,12);
+  s+=btn(260,470,104,46,'#8fa2bd',T(312,500,'Забрать',{size:17,w:800,fill:'#fff'}));
+  s+=btn(374,470,132,46,C.orange,adIcon(404,493,20,'#fff',C.orange)+T(456,502,'×2',{size:24,w:900,fill:'#fff',stroke:'#b35c00',sw:4}));
+  // upgrades
+  s+=T(24,576,'Улучшения',{size:21,w:900,anchor:'start'})+T(516,576,'Доход: 45 / ч',{size:14,w:700,fill:C.sub,anchor:'end'});
+  const up=[['truck','Грузчики','Тележки уезжают быстрее','Ур.3','450',true],
+            ['cash','Касса рейсов','+10% монет за рейс','Ур.2','600',true],
+            ['house','Склад','Офлайн-доход до 6 часов','Ур.1','1 500',false]];
+  up.forEach(([ic,t,d,lv,price,ok],i)=>{const y=592+i*72;
+    s+=`<rect x="20" y="${y}" width="500" height="62" rx="16" fill="#fff" filter="url(#sh)"/>`;
+    s+=`<circle cx="56" cy="${y+31}" r="23" fill="#eef2f7"/>`+icons[ic](56,y+31);
+    s+=T(92,y+27,t,{size:17,w:800,anchor:'start'})+`<rect x="${92+t.length*9.6+8}" y="${y+12}" width="44" height="20" rx="10" fill="#e3e9f1"/>`+T(92+t.length*9.6+30,y+27,lv,{size:12,w:800,fill:C.sub});
+    s+=T(92,y+48,d,{size:13,w:500,fill:C.sub,anchor:'start'});
+    s+=btn(394,y+10,112,40,ok?C.green:'#b8c3d1',coin(418,y+30,11)+T(462,y+37,price,{size:18,w:900,fill:'#fff'}));
+  });
+  // city path
+  s+=`<rect x="70" y="818" width="400" height="6" rx="3" fill="#d5dee9"/><rect x="70" y="818" width="40" height="6" rx="3" fill="${C.green}"/>`;
+  [['Москва',70,1],['Сочи',203,0],['Казань',336,0],['Стамбул',470,0]].forEach(([n,x,on])=>{
+    s+=`<circle cx="${x}" cy="821" r="14" fill="${on?C.green:'#b8c3d1'}" stroke="#fff" stroke-width="3"/>`+(on?star(x,821,8,'#fff','#fff',0):icons.lock(x,822));
+    s+=T(x,852,n,{size:13,w:700,fill:on?C.ink:'#97a3b5'});
+  });
+  s+=btn(70,866,400,72,C.green,T(270,903,'ИГРАТЬ',{size:32,w:900,fill:'#fff',stroke:'#1f9a50',sw:5})+T(270,926,'Уровень 12',{size:15,w:700,fill:'#fff',op:.95}));
+  document.getElementById('hub').innerHTML=s;
+})();
+
+/* ================= SHOP ================= */
+(function(){
+  let s=`<rect width="540" height="960" fill="url(#shopBg)"/>`;
+  const r=rng(3); for(let i=0;i<30;i++) s+=`<circle cx="${r()*540}" cy="${r()*960}" r="${1+r()*2}" fill="#fff" opacity=".15"/>`;
+  s+=coinsPill(18,22,'1 250');
+  s+=`<circle cx="500" cy="42" r="22" fill="#ff5a5f" filter="url(#sh)"/><path d="M492 34 l16 16 m0 -16 l-16 16" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`;
+  s+=T(282,52,'МАГАЗИН',{size:30,w:900,fill:'#fff',stroke:'#16223d',sw:6});
+  // starter pack
+  s+=`<rect x="20" y="88" width="500" height="250" rx="26" fill="url(#starter)" filter="url(#shBig)"/>`;
+  s+=`<rect x="20" y="88" width="500" height="250" rx="26" fill="none" stroke="#fff" stroke-width="3" opacity=".5"/>`;
+  s+=T(44,128,'СТАРТОВЫЙ НАБОР',{size:24,w:900,fill:'#fff',anchor:'start',stroke:'#c23a5e',sw:5});
+  s+=T(44,150,'Только один раз · ⏱ 23:59:12',{size:14,w:600,fill:'#fff',anchor:'start',op:.9});
+  s+=`<g transform="rotate(12 466 122)"><circle cx="466" cy="122" r="34" fill="#ffd23f" stroke="#fff" stroke-width="3"/></g>`+T(466,130,'−70%',{size:20,w:900,fill:'#c23a5e',rot:12});
+  const items=[['coin','2 000'],['magnet','×3'],['freeze','×3'],['skin','Скин']];
+  items.forEach(([ic,l],i)=>{const x=40+i*116;
+    s+=`<rect x="${x}" y="166" width="104" height="96" rx="16" fill="#fff" opacity=".22"/>`;
+    const cx=x+52, cy=204;
+    if(ic==='coin') s+=coin(cx-10,cy+6,14)+coin(cx+10,cy+6,14)+coin(cx,cy-8,14);
+    else if(ic==='skin') s+=`<g transform="translate(${cx-34} ${cy+2}) scale(.27)">${plane(0,0,1,0,'#ff4f8b').replace(/<g transform="[^"]*">/,'<g>')}</g>`;
+    else s+=`<circle cx="${cx}" cy="${cy}" r="26" fill="#fff"/>`+icons[ic](cx,cy);
+    s+=T(cx,252,l,{size:17,w:900,fill:'#fff',stroke:'#c23a5e',sw:4});
+  });
+  s+=btn(150,272,240,52,'#ffffff',T(214,304,'329 ₽',{size:16,w:600,fill:'#97a3b5',style:'text-decoration:line-through'})+T(300,307,'99 ₽',{size:26,w:900,fill:'#ff4f8b'}));
+  // no ads
+  s+=`<rect x="20" y="356" width="500" height="92" rx="22" fill="#fff" filter="url(#sh)"/>`;
+  s+=`<circle cx="66" cy="402" r="28" fill="#fff0f0"/>`+icons.noads(66,402);
+  s+=T(108,396,'Отключить рекламу',{size:19,w:900,anchor:'start'})+T(108,420,'Без рекламы между уровнями',{size:13,w:500,fill:C.sub,anchor:'start'});
+  s+=btn(388,380,118,46,C.green,T(447,411,'199 ₽',{size:21,w:900,fill:'#fff'}));
+  // coins
+  s+=T(24,484,'Монеты',{size:21,w:900,fill:'#fff',anchor:'start'});
+  const packs=[['100',3,'free'],['2 500',7,'79 ₽'],['8 000',15,'199 ₽']];
+  packs.forEach(([amt,n,price],i)=>{const x=20+i*170;
+    s+=`<rect x="${x}" y="498" width="160" height="196" rx="20" fill="#fff" filter="url(#sh)"/>`;
+    if(i===2){s+=`<rect x="${x+28}" y="488" width="104" height="26" rx="13" fill="#ff4f8b"/>`+T(x+80,506,'ВЫГОДНО',{size:13,w:900,fill:'#fff'});}
+    s+=`<ellipse cx="${x+80}" cy="590" rx="58" ry="10" fill="#000" opacity=".06"/>`+coinPile(x+80,592,n);
+    s+=T(x+80,624,amt,{size:24,w:900});
+    if(price==='free') s+=btn(x+14,636,132,44,C.orange,adIcon(x+36,658,16,'#fff',C.orange)+T(x+90,664,'Бесплатно',{size:15,w:800,fill:'#fff'}));
+    else s+=btn(x+14,636,132,44,C.green,T(x+80,666,price,{size:20,w:900,fill:'#fff'}));
+  });
+  // boosters pack
+  s+=T(24,736,'Бустеры',{size:21,w:900,fill:'#fff',anchor:'start'});
+  s+=`<rect x="20" y="750" width="500" height="92" rx="22" fill="#fff" filter="url(#sh)"/>`;
+  ['magnet','freeze','slot','shuffle'].forEach((ic,i)=>{const cx=62+i*72;
+    s+=`<circle cx="${cx}" cy="790" r="28" fill="#f1f5fa"/>`+icons[ic](cx,788)+T(cx,830,'×5',{size:13,w:900,fill:C.sub});});
+  s+=btn(388,774,118,46,C.green,T(447,805,'149 ₽',{size:21,w:900,fill:'#fff'}));
+  // daily wheel
+  s+=`<rect x="20" y="860" width="500" height="80" rx="22" fill="#ffffff" opacity=".12"/>`;
+  s+=`<g transform="translate(66 900) scale(1.15) translate(-66 -900)">${icons.wheel(66,900)}</g>`;
+  s+=T(108,894,'Колесо удачи',{size:19,w:900,fill:'#fff',anchor:'start'})+T(108,916,'1 прокрут в день бесплатно',{size:13,w:500,fill:'#fff',anchor:'start',op:.8});
+  s+=btn(376,878,130,46,C.orange,T(441,908,'Крутить',{size:19,w:900,fill:'#fff'}));
+  document.getElementById('shop').innerHTML=s;
+})();
+</script>
+</body>
+</html>
